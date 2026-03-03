@@ -27,17 +27,41 @@ export async function parseToukiText(rawText: string): Promise<{
   const responseText =
     message.content[0].type === "text" ? message.content[0].text : "";
 
-  // Extract JSON from response (handle markdown code blocks)
-  let jsonStr = responseText;
-  const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  // Extract JSON from response
+  let jsonStr = responseText.trim();
+
+  // 1. Handle markdown code blocks (```json ... ``` or ``` ... ```)
+  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
     jsonStr = jsonMatch[1].trim();
+  }
+
+  // 2. If still not starting with { or [, try to find JSON object in the text
+  if (!jsonStr.startsWith("{") && !jsonStr.startsWith("[")) {
+    const braceStart = jsonStr.indexOf("{");
+    if (braceStart !== -1) {
+      jsonStr = jsonStr.substring(braceStart);
+      // Find the matching closing brace
+      let depth = 0;
+      let end = -1;
+      for (let i = 0; i < jsonStr.length; i++) {
+        if (jsonStr[i] === "{") depth++;
+        else if (jsonStr[i] === "}") {
+          depth--;
+          if (depth === 0) { end = i; break; }
+        }
+      }
+      if (end !== -1) {
+        jsonStr = jsonStr.substring(0, end + 1);
+      }
+    }
   }
 
   let parsedData: unknown;
   try {
     parsedData = JSON.parse(jsonStr);
   } catch {
+    console.error("Claude API response (raw):", responseText.substring(0, 500));
     throw new Error("Claude APIからの応答をJSONとしてパースできませんでした");
   }
 
