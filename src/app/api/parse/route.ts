@@ -17,7 +17,9 @@ export async function POST(request: Request) {
       // PDF file: extract text using pdfjs-dist
       try {
         inputText = await extractTextFromPdf(pdfBase64);
-      } catch {
+        console.log("PDF text extracted, length:", inputText.length, "preview:", inputText.substring(0, 200));
+      } catch (pdfError) {
+        console.error("PDF extraction error:", pdfError);
         const errorResponse: ParseResponse = {
           success: false,
           warnings: [],
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     }
 
     // Parse the touki text using Claude
+    console.log("Sending to Claude, text length:", inputText.length, "first 300 chars:", inputText.substring(0, 300));
     const { data: parsedData, warnings: parseWarnings } = await parseToukiText(inputText);
 
     // Run risk detection and collect all risk flags
