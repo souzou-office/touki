@@ -12,6 +12,7 @@ export async function parseToukiText(rawText: string): Promise<{
   const client = getClaudeClient();
   const warnings: string[] = [];
 
+  // Use assistant prefill to force JSON output
   const message = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 4096,
@@ -19,7 +20,11 @@ export async function parseToukiText(rawText: string): Promise<{
     messages: [
       {
         role: "user",
-        content: `以下の登記情報をJSONに変換してください。\n\n${normalizedText}`,
+        content: `以下の登記情報テキストを読み取り、指定されたJSONスキーマに変換してください。罫線文字はテーブル構造を表しています。\n\n${normalizedText}`,
+      },
+      {
+        role: "assistant",
+        content: "{",
       },
     ],
   });
@@ -27,42 +32,29 @@ export async function parseToukiText(rawText: string): Promise<{
   const responseText =
     message.content[0].type === "text" ? message.content[0].text : "";
 
-  // Extract JSON from response
-  let jsonStr = responseText.trim();
+  // Prepend the "{" from prefill to reconstruct the full JSON
+  const jsonStr = "{" + responseText.trim();
 
-  // 1. Handle markdown code blocks (```json ... ``` or ``` ... ```)
-  const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[1].trim();
-  }
-
-  // 2. If still not starting with { or [, try to find JSON object in the text
-  if (!jsonStr.startsWith("{") && !jsonStr.startsWith("[")) {
-    const braceStart = jsonStr.indexOf("{");
-    if (braceStart !== -1) {
-      jsonStr = jsonStr.substring(braceStart);
-      // Find the matching closing brace
-      let depth = 0;
-      let end = -1;
-      for (let i = 0; i < jsonStr.length; i++) {
-        if (jsonStr[i] === "{") depth++;
-        else if (jsonStr[i] === "}") {
-          depth--;
-          if (depth === 0) { end = i; break; }
-        }
-      }
-      if (end !== -1) {
-        jsonStr = jsonStr.substring(0, end + 1);
-      }
-    }
-  }
+  console.log("Claude response (first 500 chars):", jsonStr.substring(0, 500));
 
   let parsedData: unknown;
   try {
     parsedData = JSON.parse(jsonStr);
   } catch {
-    console.error("Claude API response (raw):", responseText.substring(0, 500));
-    throw new Error("Claude APIからの応答をJSONとしてパースできませんでした");
+    // Try extracting JSON from potential markdown code blocks or extra text
+    let extracted = jsonStr;
+    const jsonMatch = extracted.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsedData = JSON.parse(jsonMatch[0]);
+      } catch {
+        console.error("Claude API response (raw):", jsonStr.substring(0, 1000));
+        throw new Error("Claude APIからの応答をJSONとしてパースできませんでした");
+      }
+    } else {
+      console.error("Claude API response (raw):", jsonStr.substring(0, 1000));
+      throw new Error("Claude APIからの応答をJSONとしてパースできませんでした");
+    }
   }
 
   // Extract parseConfidence from Claude's response before building meta
