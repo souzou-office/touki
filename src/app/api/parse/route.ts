@@ -4,22 +4,41 @@ import { detectRisks } from "@/lib/analysis/risk-detector";
 import { saveProperty, StoredProperty } from "@/lib/store";
 import { ParseResponse } from "@/types/api";
 import { RiskFlag } from "@/types/risk";
+import pdfParse from "pdf-parse";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { text } = body;
+    const { text, pdfBase64 } = body;
 
-    if (!text || typeof text !== "string") {
+    let inputText: string;
+
+    if (pdfBase64 && typeof pdfBase64 === "string") {
+      // PDF file: extract text using pdf-parse
+      try {
+        const pdfBuffer = Buffer.from(pdfBase64, "base64");
+        const pdfData = await pdfParse(pdfBuffer);
+        inputText = pdfData.text;
+      } catch {
+        const errorResponse: ParseResponse = {
+          success: false,
+          warnings: [],
+          error: "PDFファイルからテキストを抽出できませんでした。別のPDFファイルを試すか、テキスト入力をご利用ください。",
+        };
+        return NextResponse.json(errorResponse, { status: 400 });
+      }
+    } else if (text && typeof text === "string") {
+      inputText = text;
+    } else {
       const errorResponse: ParseResponse = {
         success: false,
         warnings: [],
-        error: "リクエストに「text」フィールド（文字列）が必要です。",
+        error: "リクエストに「text」または「pdfBase64」フィールドが必要です。",
       };
       return NextResponse.json(errorResponse, { status: 400 });
     }
 
-    if (text.trim().length === 0) {
+    if (inputText.trim().length === 0) {
       const errorResponse: ParseResponse = {
         success: false,
         warnings: [],
@@ -29,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     // Parse the touki text using Claude
-    const { data: parsedData, warnings: parseWarnings } = await parseToukiText(text);
+    const { data: parsedData, warnings: parseWarnings } = await parseToukiText(inputText);
 
     // Run risk detection and collect all risk flags
     const risks: RiskFlag[] = detectRisks(parsedData);
@@ -54,7 +73,7 @@ export async function POST(request: Request) {
       id: parsedData.meta.id,
       name: propertyName,
       propertyType: parsedData.property.type,
-      rawText: text,
+      rawText: inputText,
       parsedData,
       parseConfidence: parsedData.meta.parseConfidence,
       createdAt: now,

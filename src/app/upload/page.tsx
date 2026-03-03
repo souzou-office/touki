@@ -238,9 +238,21 @@ export default function UploadPage() {
 
   const handleFileSelect = useCallback(
     async (file: File) => {
-      // For file uploads, read as text and submit
-      const text = await file.text();
-      handleParse({ text });
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        // PDF: read as base64 and send for server-side text extraction
+        const arrayBuffer = await file.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
+        );
+        handleParse({ pdfBase64: base64 });
+      } else {
+        // TXT: read as text directly
+        const text = await file.text();
+        handleParse({ text });
+      }
     },
     [handleParse]
   );
