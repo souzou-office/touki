@@ -13,7 +13,7 @@ export async function parseToukiText(rawText: string): Promise<{
   const warnings: string[] = [];
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-5-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 4096,
     system: PARSE_SYSTEM_PROMPT,
     messages: [
