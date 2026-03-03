@@ -4,7 +4,7 @@ import { detectRisks } from "@/lib/analysis/risk-detector";
 import { saveProperty, StoredProperty } from "@/lib/store";
 import { ParseResponse } from "@/types/api";
 import { RiskFlag } from "@/types/risk";
-import pdfParse from "pdf-parse";
+import { extractTextFromPdf } from "@/lib/pdf/extract-text";
 
 export async function POST(request: Request) {
   try {
@@ -14,11 +14,9 @@ export async function POST(request: Request) {
     let inputText: string;
 
     if (pdfBase64 && typeof pdfBase64 === "string") {
-      // PDF file: extract text using pdf-parse
+      // PDF file: extract text using pdfjs-dist
       try {
-        const pdfBuffer = Buffer.from(pdfBase64, "base64");
-        const pdfData = await pdfParse(pdfBuffer);
-        inputText = pdfData.text;
+        inputText = await extractTextFromPdf(pdfBase64);
       } catch {
         const errorResponse: ParseResponse = {
           success: false,

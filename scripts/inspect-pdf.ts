@@ -3,7 +3,8 @@
  * Usage: npx tsx scripts/inspect-pdf.ts <path-to-pdf>
  */
 import fs from "fs";
-import pdfParse from "pdf-parse";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 
 async function main() {
   const pdfPath = process.argv[2];

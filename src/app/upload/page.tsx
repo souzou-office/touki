@@ -195,7 +195,7 @@ export default function UploadPage() {
   const [saving, setSaving] = useState(false);
 
   const handleParse = useCallback(
-    async (body: { text?: string; fileId?: string }) => {
+    async (body: { text?: string; fileId?: string; pdfBase64?: string }) => {
       setStep("processing");
       setError(null);
       setParseResult(null);
